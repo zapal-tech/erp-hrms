@@ -1,11 +1,11 @@
 app_name = "hrms"
-app_title = "Frappe HR"
+app_title = "Zapal HR"
 app_publisher = "Frappe Technologies Pvt. Ltd."
 app_description = "Modern HR and Payroll Software"
 app_email = "contact@frappe.io"
 app_license = "GNU General Public License (v3)"
-required_apps = ["frappe/erpnext"]
-source_link = "http://github.com/frappe/hrms"
+required_apps = ["zapal-tech/erp-erpnext"]
+source_link = "http://github.com/zapal-tech/erp-hrms"
 
 
 # Includes in <head>
