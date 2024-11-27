@@ -1,10 +1,8 @@
 <template>
 	<div class="flex flex-col h-full w-full" v-if="isFormReady">
-		<div
-			class="w-full h-full bg-white sm:w-96 flex flex-col relative overflow-y-auto"
-		>
+		<div class="w-full h-full bg-white sm:w-96 flex flex-col">
 			<header
-				class="flex flex-row bg-white shadow-sm py-4 px-3 items-center border-b sticky top-0 z-[1000]"
+				class="flex flex-row bg-white shadow-sm py-4 px-3 items-center sticky top-0 z-[1000]"
 			>
 				<Button
 					variant="ghost"
@@ -20,7 +18,7 @@
 					<h2
 						class="text-xl font-semibold text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis"
 					>
-						{{ doctype }}
+						{{ __(props.doctype) }}
 					</h2>
 					<Badge
 						:label="id"
@@ -29,7 +27,7 @@
 					/>
 					<Badge
 						v-if="status"
-						:label="status"
+						:label="__(status, null, doctype)"
 						:theme="statusColor"
 						class="whitespace-nowrap text-[8px]"
 					/>
@@ -38,98 +36,97 @@
 						class="ml-auto"
 						:options="[
 							{
-								label: 'Delete',
+								label: __('Delete'),
 								condition: showDeleteButton,
 								onClick: () => (showDeleteDialog = true),
 							},
-							{ label: 'Reload', onClick: () => reloadDoc() },
+							{ label: __('Reload'), onClick: () => reloadDoc() },
 						]"
 						:button="{
-							label: 'Menu',
+							label: __('Menu'),
 							icon: 'more-horizontal',
 							variant: 'ghost',
 						}"
 					/>
 				</div>
 				<h2 v-else class="text-2xl font-semibold text-gray-900">
-					{{ `New ${doctype}` }}
+					{{ __('New {0}', [__(doctype)], props.doctype) }}
 				</h2>
 			</header>
 
 			<!-- Form -->
-			<div class="bg-white grow">
+			<div class="bg-white grow overflow-y-auto">
 				<!-- Tabs -->
-				<div
-					class="px-4 sticky top-15 z-[100] bg-white text-sm font-medium text-center text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700"
-				>
-					<ul class="flex -mb-px overflow-auto hide-scrollbar">
-						<li class="mr-2 whitespace-nowrap" v-for="tab in tabs">
-							<button
-								@click="activeTab = tab.name"
-								class="inline-block p-4 border-b-2 border-transparent rounded-t-lg"
-								:class="[
-									activeTab === tab.name
-										? '!text-gray-800 !border-gray-800'
-										: 'hover:text-gray-600 hover:border-gray-300',
-								]"
-							>
-								{{ tab.name }}
-							</button>
-						</li>
-					</ul>
-				</div>
-
-				<template
-					v-if="tabbedView"
-					v-for="(fieldList, tabName, index) in tabFields"
-				>
+				<template v-if="tabbedView">
 					<div
-						v-show="tabName === activeTab"
-						class="flex flex-col space-y-4 p-4"
+						class="px-4 sticky top-0 z-[100] bg-white text-sm font-medium text-center text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700"
 					>
-						<template v-for="field in fieldList" :key="field.fieldname">
-							<slot
-								v-if="field.fieldtype == 'Table'"
-								:name="field.fieldname"
-								:isFormReadOnly="isFormReadOnly"
-							></slot>
-
-							<FormField
-								v-else
-								:fieldtype="field.fieldtype"
-								:fieldname="field.fieldname"
-								v-model="formModel[field.fieldname]"
-								:default="field.default"
-								:label="field.label"
-								:options="field.options"
-								:linkFilters="field.linkFilters"
-								:documentList="field.documentList"
-								:readOnly="Boolean(field.read_only) || isFormReadOnly"
-								:reqd="Boolean(field.reqd)"
-								:hidden="Boolean(field.hidden)"
-								:errorMessage="field.error_message"
-								:minDate="field.minDate"
-								:maxDate="field.maxDate"
-								:addSectionPadding="fieldList[0].name !== field.name"
-							/>
-						</template>
-
-						<!-- Attachment upload -->
-						<div
-							class="flex flex-row gap-2 items-center justify-center p-5"
-							v-if="isFileUploading"
-						>
-							<LoadingIndicator class="w-3 h-3 text-gray-800" />
-							<span class="text-gray-900 text-sm">Uploading...</span>
-						</div>
-
-						<FileUploaderView
-							v-else-if="showAttachmentView && index === 0"
-							v-model="fileAttachments"
-							@handleFileSelect="handleFileSelect"
-							@handleFileDelete="handleFileDelete"
-						/>
+						<ul class="flex -mb-px overflow-auto hide-scrollbar">
+							<li class="mr-2 whitespace-nowrap" v-for="tab in tabs">
+								<button
+									@click="activeTab = tab.name"
+									class="inline-block py-4 px-2 border-b-2 border-transparent rounded-t-lg"
+									:class="[
+										activeTab === tab.name
+											? '!text-gray-800 !border-gray-800'
+											: 'hover:text-gray-600 hover:border-gray-300',
+									]"
+								>
+									{{ __(tab.name, null, props.doctype) }}
+								</button>
+							</li>
+						</ul>
 					</div>
+
+					<template v-for="(fieldList, tabName, index) in tabFields">
+						<div
+							v-show="tabName === activeTab"
+							class="flex flex-col space-y-4 p-4"
+						>
+							<template v-for="field in fieldList" :key="field.fieldname">
+								<slot
+									v-if="field.fieldtype == 'Table'"
+									:name="field.fieldname"
+									:isFormReadOnly="isFormReadOnly"
+								></slot>
+
+								<FormField
+									v-else
+									:fieldtype="field.fieldtype"
+									:fieldname="field.fieldname"
+									v-model="formModel[field.fieldname]"
+									:default="field.default"
+									:label="__(field.label, null, props.doctype)"
+									:options="field.options"
+									:linkFilters="field.linkFilters"
+									:documentList="field.documentList"
+									:readOnly="isFieldReadOnly(field)"
+									:reqd="Boolean(field.reqd)"
+									:hidden="Boolean(field.hidden)"
+									:errorMessage="field.error_message"
+									:minDate="field.minDate"
+									:maxDate="field.maxDate"
+									:addSectionPadding="fieldList[0].name !== field.name"
+								/>
+							</template>
+
+							<!-- Attachment upload -->
+							<div
+								class="flex flex-row gap-2 items-center justify-center p-5"
+								v-if="isFileUploading"
+							>
+								<LoadingIndicator class="w-3 h-3 text-gray-800" />
+								<span class="text-gray-900 text-sm">{{ __("Uploading...") }} </span>
+							</div>
+
+							<FileUploaderView
+								v-else-if="showAttachmentView && index === 0"
+								v-model="fileAttachments"
+								@handleFileSelect="handleFileSelect"
+								@handleFileDelete="handleFileDelete"
+							/>
+						</div>
+					</template>
 				</template>
 
 				<div class="flex flex-col space-y-4 p-4" v-else>
@@ -140,11 +137,11 @@
 						:fieldname="field.fieldname"
 						v-model="formModel[field.fieldname]"
 						:default="field.default"
-						:label="field.label"
+						:label="__(field.label, null, props.doctype)"
 						:options="field.options"
 						:linkFilters="field.linkFilters"
 						:documentList="field.documentList"
-						:readOnly="Boolean(field.read_only) || isFormReadOnly"
+						:readOnly="isFieldReadOnly(field)"
 						:reqd="Boolean(field.reqd)"
 						:hidden="Boolean(field.hidden)"
 						:errorMessage="field.error_message"
@@ -158,7 +155,7 @@
 						v-if="isFileUploading"
 					>
 						<LoadingIndicator class="w-3 h-3 text-gray-800" />
-						<span class="text-gray-900 text-sm">Uploading...</span>
+						<span class="text-gray-900 text-sm">{{ __("Uploading...") }} </span>
 					</div>
 
 					<FileUploaderView
@@ -174,7 +171,7 @@
 			<!-- custom form button eg: Download button in salary slips -->
 			<div
 				v-if="!showFormButton"
-				class="px-4 pt-4 mt-2 sm:w-96 bg-white sticky bottom-0 w-full drop-shadow-xl z-40 border-t rounded-t-lg pb-10"
+				class="px-4 pt-4 pb-4 standalone:pb-safe-bottom sm:w-96 bg-white sticky bottom-0 w-full drop-shadow-xl z-40 border-t rounded-t-lg"
 			>
 				<slot name="formButton"></slot>
 			</div>
@@ -190,7 +187,7 @@
 			<!-- save/submit/cancel -->
 			<div
 				v-else-if="isFormDirty || (!workflow?.hasWorkflow && formButton)"
-				class="px-4 pt-4 mt-2 sm:w-96 bg-white sticky bottom-0 w-full drop-shadow-xl z-40 border-t rounded-t-lg pb-10"
+				class="px-4 pt-4 pb-4 standalone:pb-safe-bottom sm:w-96 bg-white sticky bottom-0 w-full drop-shadow-xl z-40 border-t rounded-t-lg"
 			>
 				<ErrorMessage
 					class="mb-2"
@@ -202,7 +199,7 @@
 				/>
 
 				<Button
-					class="w-full rounded mt-2 py-5 text-base disabled:bg-gray-700 disabled:text-white"
+					class="w-full rounded py-5 text-base disabled:bg-gray-700 disabled:text-white"
 					:class="formButton === 'Cancel' ? 'shadow' : ''"
 					@click="formButton === 'Save' ? saveForm() : submitOrCancelForm()"
 					:variant="formButton === 'Cancel' ? 'subtle' : 'solid'"
@@ -210,7 +207,7 @@
 						docList.insert.loading || documentResource?.setValue?.loading
 					"
 				>
-					{{ formButton }}
+					{{ __(formButton) }}
 				</Button>
 			</div>
 		</div>
@@ -219,11 +216,11 @@
 	<!-- Confirmation Dialogs -->
 	<Dialog v-model="showDeleteDialog">
 		<template #body-title>
-			<h2 class="text-xl font-bold">Delete {{ props.doctype }}</h2>
+			<h2 class="text-xl font-bold">{{ __("Delete {0}", [__(props.doctype)]) }}</h2>
 		</template>
 		<template #body-content>
 			<p>
-				Are you sure you want to delete the {{ props.doctype }}
+				{{ __("Are you sure you want to delete the {0}", [__(props.doctype)])  }}
 				<span class="font-bold">{{ formModel.name }}</span>
 				?
 			</p>
@@ -235,7 +232,7 @@
 					class="py-5 w-full"
 					@click="showDeleteDialog = false"
 				>
-					Cancel
+					{{ __("Cancel") }}
 				</Button>
 				<Button
 					variant="solid"
@@ -243,7 +240,7 @@
 					@click="handleDocDelete"
 					class="py-5 w-full"
 				>
-					Delete
+					{{__("Delete") }}
 				</Button>
 			</div>
 		</template>
@@ -251,11 +248,11 @@
 
 	<Dialog v-model="showSubmitDialog">
 		<template #body-title>
-			<h2 class="text-xl font-bold">Confirm</h2>
+			<h2 class="text-xl font-bold">{{ __("Confirm") }} </h2>
 		</template>
 		<template #body-content>
 			<p>
-				Permanently submit {{ props.doctype }}
+				{{ __("Permanently submit {0}", [__(props.doctype)]) }}
 				<span class="font-bold">{{ formModel.name }}</span>
 				?
 			</p>
@@ -267,14 +264,14 @@
 					class="py-5 w-full"
 					@click="showSubmitDialog = false"
 				>
-					No
+					{{ __("No") }}
 				</Button>
 				<Button
 					variant="solid"
 					@click="handleDocUpdate('submit')"
 					class="py-5 w-full"
 				>
-					Yes
+					{{ __("Yes") }}
 				</Button>
 			</div>
 		</template>
@@ -282,11 +279,11 @@
 
 	<Dialog v-model="showCancelDialog">
 		<template #body-title>
-			<h2 class="text-xl font-bold">Confirm</h2>
+			<h2 class="text-xl font-bold">{{ __("Confirm") }} </h2>
 		</template>
 		<template #body-content>
 			<p>
-				Permanently cancel {{ props.doctype }}
+				{{ __("Permanently cancel {0}", [__(props.doctype)]) }}
 				<span class="font-bold">{{ formModel.name }}</span
 				>?
 			</p>
@@ -298,14 +295,14 @@
 					class="py-5 w-full"
 					@click="showCancelDialog = false"
 				>
-					No
+					{{ __("No") }}
 				</Button>
 				<Button
 					variant="solid"
 					@click="handleDocUpdate('cancel')"
 					class="py-5 w-full"
 				>
-					Yes
+					{{ __("Yes") }}
 				</Button>
 			</div>
 		</template>
@@ -313,7 +310,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from "vue"
+import { computed, inject, nextTick, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import {
 	ErrorMessage,
@@ -380,6 +377,9 @@ const props = defineProps({
 })
 const emit = defineEmits(["validateForm", "update:modelValue"])
 const router = useRouter()
+
+const __ = inject("$translate")
+
 let activeTab = ref(props.tabs?.[0].name)
 let fileAttachments = ref([])
 let statusColor = ref("")
@@ -512,8 +512,8 @@ const docList = createListResource({
 	insert: {
 		async onSuccess(data) {
 			toast({
-				title: "Success",
-				text: `${props.doctype} created successfully!`,
+				title: __("Success"),
+				text: __("{0} created successfully!", [__(props.doctype)]),
 				icon: "check-circle",
 				position: "bottom-center",
 				iconClasses: "text-green-500",
@@ -527,8 +527,8 @@ const docList = createListResource({
 		},
 		onError() {
 			toast({
-				title: "Error",
-				text: `Error creating ${props.doctype}`,
+				title: __("Error"),
+				text: __("Error creating {0}", [__(props.doctype)]),
 				icon: "alert-circle",
 				position: "bottom-center",
 				iconClasses: "text-red-500",
@@ -545,8 +545,8 @@ const documentResource = createDocumentResource({
 	setValue: {
 		onSuccess() {
 			toast({
-				title: "Success",
-				text: `${props.doctype} updated successfully!`,
+				title: __("Success"),
+				text: __("{0} updated successfully!", [__(props.doctype)]),
 				icon: "check-circle",
 				position: "bottom-center",
 				iconClasses: "text-green-500",
@@ -554,8 +554,8 @@ const documentResource = createDocumentResource({
 		},
 		onError() {
 			toast({
-				title: "Error",
-				text: `Error updating ${props.doctype}`,
+				title: __("Error"),
+				text: __("Error updating {0}", [__(props.doctype)]),
 				icon: "alert-circle",
 				position: "bottom-center",
 				iconClasses: "text-red-500",
@@ -567,8 +567,8 @@ const documentResource = createDocumentResource({
 		onSuccess() {
 			router.back()
 			toast({
-				title: "Success",
-				text: `${props.doctype} deleted successfully!`,
+				title: __("Success"),
+				text: __("{0} deleted successfully!", [__(props.doctype)]),
 				icon: "check-circle",
 				position: "bottom-center",
 				iconClasses: "text-green-500",
@@ -576,8 +576,8 @@ const documentResource = createDocumentResource({
 		},
 		onError() {
 			toast({
-				title: "Error",
-				text: `Error deleting ${props.doctype}`,
+				title: __("Error"),
+				text: __("Error deleting {0}", [__(props.doctype)]),
 				icon: "alert-circle",
 				position: "bottom-center",
 				iconClasses: "text-red-500",
@@ -589,6 +589,12 @@ const documentResource = createDocumentResource({
 
 const docPermissions = createResource({
 	url: "frappe.client.get_doc_permissions",
+	params: { doctype: props.doctype, docname: props.id },
+})
+
+const permittedWriteFields = createResource({
+	url: "hrms.api.get_permitted_fields_for_write",
+	params: { doctype: props.doctype },
 })
 
 const formButton = computed(() => {
@@ -611,6 +617,14 @@ function showDeleteButton() {
 
 function hasPermission(action) {
 	return docPermissions.data?.permissions[action]
+}
+
+function isFieldReadOnly(field) {
+	return (
+		Boolean(field.read_only)
+		|| isFormReadOnly.value
+		|| (props.id && !permittedWriteFields.data?.includes(field.fieldname))
+	)
 }
 
 function handleDocInsert() {
@@ -739,7 +753,8 @@ onMounted(async () => {
 	if (props.id) {
 		await documentResource.get.promise
 		formModel.value = { ...documentResource.doc }
-		await docPermissions.fetch({ doctype: props.doctype, docname: props.id })
+		await docPermissions.reload()
+		await permittedWriteFields.reload()
 		await attachedFiles.reload()
 		await setFormattedCurrency()
 

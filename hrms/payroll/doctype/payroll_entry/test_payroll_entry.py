@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 
 import frappe
 from frappe.tests.utils import FrappeTestCase, change_settings
-from frappe.utils import add_days, add_months, cstr
+from frappe.utils import add_days, add_months, cstr, flt
 
 import erpnext
 from erpnext.accounts.utils import get_fiscal_year, getdate, nowdate
@@ -46,11 +46,13 @@ class TestPayrollEntry(FrappeTestCase):
 	def setUp(self):
 		for dt in [
 			"Salary Slip",
+			"Salary Detail",
 			"Salary Component",
 			"Salary Component Account",
 			"Payroll Entry",
 			"Salary Structure",
 			"Salary Structure Assignment",
+			"Employee Cost Center",
 			"Payroll Employee Detail",
 			"Additional Salary",
 		]:
@@ -63,9 +65,7 @@ class TestPayrollEntry(FrappeTestCase):
 		frappe.db.set_single_value("Payroll Settings", "email_salary_slip_to_employee", 0)
 
 		# set default payable account
-		default_account = frappe.db.get_value(
-			"Company", "_Test Company", "default_payroll_payable_account"
-		)
+		default_account = frappe.db.get_value("Company", "_Test Company", "default_payroll_payable_account")
 		if not default_account or default_account != "_Test Payroll Payable - _TC":
 			create_account(
 				account_name="_Test Payroll Payable",
@@ -148,9 +148,7 @@ class TestPayrollEntry(FrappeTestCase):
 			department=department,
 			company="_Test Company",
 		)
-		employee2 = make_employee(
-			"test_emp2@example.com", department=department, company="_Test Company"
-		)
+		employee2 = make_employee("test_emp2@example.com", department=department, company="_Test Company")
 
 		create_assignments_with_cost_centers(employee1, employee2)
 
@@ -185,6 +183,57 @@ class TestPayrollEntry(FrappeTestCase):
 
 		self.assertEqual(je_entries, expected_je)
 
+	@change_settings("Payroll Settings", {"process_payroll_accounting_entry_based_on_employee": 0})
+	def test_employee_cost_center_breakup(self):
+		"""Test only the latest salary structure assignment is considered for cost center breakup"""
+		COMPANY = "_Test Company"
+		COST_CENTERS = {"_Test Cost Center - _TC": 60, "_Test Cost Center 2 - _TC": 40}
+		department = create_department("Cost Center Test")
+		employee = make_employee("test_emp1@example.com", department=department, company=COMPANY)
+		salary_structure = make_salary_structure(
+			"_Test Salary Structure 2",
+			"Monthly",
+			employee,
+			company=COMPANY,
+		)
+
+		# update cost centers in salary structure assignment for employee
+		new_assignment = frappe.db.get_value(
+			"Salary Structure Assignment",
+			{"employee": employee, "salary_structure": salary_structure.name, "docstatus": 1},
+			"name",
+		)
+		new_assignment = frappe.get_doc("Salary Structure Assignment", new_assignment)
+		new_assignment.payroll_cost_centers = []
+		for cost_center, percentage in COST_CENTERS.items():
+			new_assignment.append(
+				"payroll_cost_centers", {"cost_center": cost_center, "percentage": percentage}
+			)
+		new_assignment.save()
+
+		# make an old salary structure assignment to test and ensure old cost center mapping is excluded
+		old_assignment = frappe.copy_doc(new_assignment)
+		old_assignment.from_date = add_months(new_assignment.from_date, -1)
+		old_assignment.payroll_cost_centers = []
+		old_assignment.append("payroll_cost_centers", {"cost_center": "Main - _TC", "percentage": 100})
+		old_assignment.submit()
+
+		dates = get_start_end_dates("Monthly", nowdate())
+		pe = make_payroll_entry(
+			start_date=dates.start_date,
+			end_date=dates.end_date,
+			payable_account="_Test Payroll Payable - _TC",
+			currency="INR",
+			department=department,
+			company="_Test Company",
+			payment_account="Cash - _TC",
+			cost_center="Main - _TC",
+		)
+
+		# only new cost center breakup is considered
+		cost_centers = pe.get_payroll_cost_centers_for_employee(employee, "_Test Salary Structure 2")
+		self.assertEqual(cost_centers, COST_CENTERS)
+
 	def test_get_end_date(self):
 		self.assertEqual(get_end_date("2017-01-01", "monthly"), {"end_date": "2017-01-31"})
 		self.assertEqual(get_end_date("2017-02-01", "monthly"), {"end_date": "2017-02-28"})
@@ -208,9 +257,7 @@ class TestPayrollEntry(FrappeTestCase):
 		[applicant, branch, currency, payroll_payable_account] = setup_lending()
 		loan = create_loan_for_employee(applicant)
 
-		make_loan_disbursement_entry(
-			loan.name, loan.loan_amount, disbursement_date=add_months(nowdate(), -1)
-		)
+		make_loan_disbursement_entry(loan.name, loan.loan_amount, disbursement_date=add_months(nowdate(), -1))
 		process_loan_interest_accrual_for_term_loans(posting_date=nowdate())
 
 		dates = get_start_end_dates("Monthly", nowdate())
@@ -225,9 +272,7 @@ class TestPayrollEntry(FrappeTestCase):
 			payment_account="Cash - _TC",
 		)
 
-		name = frappe.db.get_value(
-			"Salary Slip", {"posting_date": nowdate(), "employee": applicant}, "name"
-		)
+		name = frappe.db.get_value("Salary Slip", {"posting_date": nowdate(), "employee": applicant}, "name")
 
 		salary_slip = frappe.get_doc("Salary Slip", name)
 		for row in salary_slip.loans:
@@ -256,9 +301,7 @@ class TestPayrollEntry(FrappeTestCase):
 		[applicant, branch, currency, payroll_payable_account] = setup_lending()
 		loan = create_loan_for_employee(applicant)
 
-		make_loan_disbursement_entry(
-			loan.name, loan.loan_amount, disbursement_date=add_months(nowdate(), -1)
-		)
+		make_loan_disbursement_entry(loan.name, loan.loan_amount, disbursement_date=add_months(nowdate(), -1))
 		process_loan_interest_accrual_for_term_loans(posting_date=nowdate())
 
 		dates = get_start_end_dates("Monthly", nowdate())
@@ -541,7 +584,7 @@ class TestPayrollEntry(FrappeTestCase):
 
 		# payroll entry
 		dates = get_start_end_dates("Monthly", nowdate())
-		payroll_entry = make_payroll_entry(
+		make_payroll_entry(
 			start_date=dates.start_date,
 			end_date=dates.end_date,
 			payable_account=company_doc.default_payroll_payable_account,
@@ -579,9 +622,7 @@ class TestPayrollEntry(FrappeTestCase):
 			department=department,
 			company="_Test Company",
 		)
-		employee2 = make_employee(
-			"test_emp2@example.com", department=department, company="_Test Company"
-		)
+		employee2 = make_employee("test_emp2@example.com", department=department, company="_Test Company")
 
 		create_assignments_with_cost_centers(employee1, employee2)
 
@@ -677,6 +718,74 @@ class TestPayrollEntry(FrappeTestCase):
 		employees = payroll_entry.get_employees_with_unmarked_attendance()
 		self.assertFalse(employees)
 
+	@if_lending_app_installed
+	@change_settings("Payroll Settings", {"process_payroll_accounting_entry_based_on_employee": 0})
+	def test_loan_repayment_from_salary(self):
+		self.run_test_for_loan_repayment_from_salary()
+
+	@if_lending_app_installed
+	@change_settings("Payroll Settings", {"process_payroll_accounting_entry_based_on_employee": 1})
+	def test_loan_repayment_from_salary_with_employee_tagging(self):
+		self.run_test_for_loan_repayment_from_salary()
+
+	def run_test_for_loan_repayment_from_salary(self):
+		from lending.loan_management.doctype.loan.test_loan import make_loan_disbursement_entry
+		from lending.loan_management.doctype.process_loan_interest_accrual.process_loan_interest_accrual import (
+			process_loan_interest_accrual_for_term_loans,
+		)
+
+		frappe.db.delete("Loan")
+		applicant, branch, currency, payroll_payable_account = setup_lending()
+
+		loan = create_loan_for_employee(applicant)
+		loan_doc = frappe.get_doc("Loan", loan.name)
+		loan_doc.repay_from_salary = 1
+		loan_doc.save()
+
+		make_loan_disbursement_entry(loan.name, loan.loan_amount, disbursement_date=add_months(nowdate(), -1))
+		process_loan_interest_accrual_for_term_loans(posting_date=nowdate())
+
+		dates = get_start_end_dates("Monthly", nowdate())
+		payroll_entry = make_payroll_entry(
+			company="_Test Company",
+			start_date=dates.start_date,
+			payable_account=payroll_payable_account,
+			currency=currency,
+			end_date=dates.end_date,
+			branch=branch,
+			cost_center="Main - _TC",
+			payment_account="Cash - _TC",
+			total_loan_repayment=loan.monthly_repayment_amount,
+		)
+
+		salary_slip_name = frappe.db.get_value("Salary Slip", {"payroll_entry": payroll_entry.name}, "name")
+		salary_slip = frappe.get_doc("Salary Slip", salary_slip_name)
+		payroll_entry.reload()
+
+		initial_gross_pay = flt(salary_slip.gross_pay) - flt(salary_slip.total_deduction)
+		loan_repayment_amount = flt(salary_slip.total_loan_repayment)
+		expected_bank_entry_amount = initial_gross_pay - loan_repayment_amount
+
+		payroll_entry.make_bank_entry()
+		submit_bank_entry(payroll_entry.name)
+
+		bank_entry = frappe.db.sql(
+			"""
+			SELECT je.total_debit, je.total_credit
+			FROM `tabJournal Entry` je
+			INNER JOIN `tabJournal Entry Account` jea ON je.name = jea.parent
+			WHERE je.voucher_type = 'Bank Entry' AND jea.reference_type = 'Payroll Entry' AND jea.reference_name = %s
+			LIMIT 1
+			""",
+			payroll_entry.name,
+			as_dict=True,
+		)
+
+		total_debit = bank_entry[0].get("total_debit", 0)
+		total_credit = bank_entry[0].get("total_credit", 0)
+		self.assertEqual(total_debit, expected_bank_entry_amount)
+		self.assertEqual(total_credit, expected_bank_entry_amount)
+
 
 def get_payroll_entry(**args):
 	args = frappe._dict(args)
@@ -757,12 +866,8 @@ def create_assignments_with_cost_centers(employee1, employee2):
 
 	ssa_doc = frappe.get_doc("Salary Structure Assignment", ssa)
 	ssa_doc.payroll_cost_centers = []
-	ssa_doc.append(
-		"payroll_cost_centers", {"cost_center": "_Test Cost Center - _TC", "percentage": 60}
-	)
-	ssa_doc.append(
-		"payroll_cost_centers", {"cost_center": "_Test Cost Center 2 - _TC", "percentage": 40}
-	)
+	ssa_doc.append("payroll_cost_centers", {"cost_center": "_Test Cost Center - _TC", "percentage": 60})
+	ssa_doc.append("payroll_cost_centers", {"cost_center": "_Test Cost Center 2 - _TC", "percentage": 40})
 	ssa_doc.save()
 
 

@@ -14,7 +14,7 @@
 							>
 								<FeatherIcon name="chevron-left" class="h-5 w-5" />
 							</Button>
-							<h2 class="text-xl font-semibold text-gray-900">Profile</h2>
+							<h2 class="text-xl font-semibold text-gray-900">{{ __("Profile") }}</h2>
 						</div>
 					</header>
 
@@ -42,6 +42,7 @@
 							}}</span>
 						</div>
 
+						<!-- Profile Links -->
 						<div class="flex flex-col gap-5 my-4 w-full">
 							<div class="flex flex-col bg-white rounded">
 								<div
@@ -67,6 +68,33 @@
 							</div>
 						</div>
 
+						<!-- Settings -->
+						<div
+							class="flex flex-col gap-5 my-4 w-full"
+							v-if="allowPushNotifications"
+						>
+							<div class="flex flex-col bg-white rounded">
+								<router-link
+									:to="{ name: 'Settings' }"
+									class="flex flex-row cursor-pointer flex-start p-4 items-center justify-between border-b"
+								>
+									<div class="flex flex-row items-center gap-3 grow">
+										<FeatherIcon
+											name="settings"
+											class="h-5 w-5 text-gray-500"
+										/>
+										<div class="text-base font-normal text-gray-800">
+											{{ __("Settings") }}
+										</div>
+									</div>
+									<FeatherIcon
+										name="chevron-right"
+										class="h-5 w-5 text-gray-500"
+									/>
+								</router-link>
+							</div>
+						</div>
+
 						<Button
 							@click="logout"
 							variant="outline"
@@ -76,7 +104,7 @@
 							<template #prefix>
 								<FeatherIcon name="log-out" class="w-4" />
 							</template>
-							Log Out
+							{{ __("Log Out") }}
 						</Button>
 					</div>
 				</div>
@@ -109,15 +137,17 @@
 </template>
 
 <script setup>
-import { inject, ref, onMounted, onBeforeUnmount } from "vue"
+import { computed, inject, ref, onMounted, onBeforeUnmount } from "vue"
 import { useRouter } from "vue-router"
 import { IonModal, IonPage, IonContent } from "@ionic/vue"
+import { FeatherIcon, createDocumentResource, createResource } from "frappe-ui"
 
 import { showErrorAlert } from "@/utils/dialogs"
-import { FeatherIcon, createDocumentResource, createResource } from "frappe-ui"
 import { formatCurrency } from "@/utils/formatters"
 
 import ProfileInfoModal from "@/components/ProfileInfoModal.vue"
+
+import { arePushNotificationsEnabled } from "@/data/notifications"
 
 const DOCTYPE = "Employee"
 
@@ -125,13 +155,14 @@ const socket = inject("$socket")
 const session = inject("$session")
 const user = inject("$user")
 const employee = inject("$employee")
+const __ = inject("$translate")
 
 const router = useRouter()
 
 const profileLinks = [
 	{
 		icon: "user",
-		title: "Employee Details",
+		title: __("Employee Details"),
 		fields: [
 			"employee_name",
 			"employee_number",
@@ -143,7 +174,7 @@ const profileLinks = [
 	},
 	{
 		icon: "file",
-		title: "Company Information",
+		title: __("Company Information"),
 		fields: [
 			"company",
 			"department",
@@ -156,7 +187,7 @@ const profileLinks = [
 	},
 	{
 		icon: "book",
-		title: "Contact Information",
+		title: __("Contact Information"),
 		fields: [
 			"cell_number",
 			"personal_email",
@@ -166,7 +197,7 @@ const profileLinks = [
 	},
 	{
 		icon: "dollar-sign",
-		title: "Salary Information",
+		title: __("Salary Information"),
 		fields: [
 			"ctc",
 			"payroll_cost_center",
@@ -184,6 +215,12 @@ const profileLinks = [
 
 const isInfoModalOpen = ref(false)
 const selectedItem = ref(null)
+
+const allowPushNotifications = computed(
+	() =>
+		window.frappe?.boot.push_relay_server_url &&
+		arePushNotificationsEnabled.data
+)
 
 const openInfoModal = async (request) => {
 	selectedItem.value = request
@@ -216,7 +253,7 @@ const getFieldInfo = (fieldname) => {
 	const field = employeeDocType.data.find(
 		(field) => field.fieldname === fieldname
 	)
-	return [field?.label, field?.fieldtype]
+	return [__(field?.label, null, "Employee"), field?.fieldtype]
 }
 
 const logout = async () => {

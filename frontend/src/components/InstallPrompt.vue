@@ -5,12 +5,12 @@
 			<h2 class="text-lg font-bold">Install Zapal HR</h2>
 		</template>
 		<template #body-content>
-			<p>Get the app on your device for easy access & a better experience!</p>
+			<p>{{ __("Get the app on your device for easy access & a better experience!") }} </p>
 		</template>
 		<template #actions>
 			<Button variant="solid" @click="() => install()" class="py-5 w-full">
 				<template #prefix><FeatherIcon name="download" class="w-4" /></template>
-				Install
+				{{ __("Install") }}
 			</Button>
 		</template>
 	</Dialog>
@@ -38,7 +38,7 @@
 				<div class="text-xs text-gray-800 px-3">
 					<span class="flex flex-col gap-2">
 						<span>
-							Get the app on your iPhone for easy access & a better experience
+							{{ __("Get the app on your iPhone for easy access & a better experience") }}
 						</span>
 						<span class="inline-flex items-start whitespace-nowrap">
 							<span>Tap&nbsp;</span>
